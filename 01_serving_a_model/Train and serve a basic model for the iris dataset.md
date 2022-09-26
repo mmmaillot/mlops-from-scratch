@@ -50,7 +50,7 @@ Since the purpose of these examples is not focusing on ML itself, but MLOps, we 
 ```python
 from sklearn.dummy import DummyClassifier
 
-dummy_classifier = DummyClassifier(strategy="constant", constant=0)
+dummy_classifier = DummyClassifier(strategy="constant", constant=y[0])
 dummy_classifier.fit(X_train,y_train)
 
 accuracy = dummy_classifier.score(X_test, y_test)
@@ -94,15 +94,51 @@ async def label(iris: Iris):
     return Label(label=label[0])
 ```
 
+You could just run this code snippet, go to http://127.0.0.1:8000/docs and toy around with the API (and see how cool FastAPI is), but if you want to have a quick feedback loop, it is best to have small unit tests.
+
+Here is one for example :
+
 ```python
 from fastapi.testclient import TestClient
 
 
-client = TestClient(app)
-response = client.post("/label",
-           json={"sepal_length": 0,
-                 "sepal_width": 0,
-                 "petal_length": 0,
-                 "petal_width": 0})
-response.json()
+def test_is_response_has_correct_form():
+    client = TestClient(app)
+    response = client.post("/label",
+                           json={"sepal_length": 0,
+                                 "sepal_width": 0,
+                                 "petal_length": 0,
+                                 "petal_width": 0}).json()
+    assert "label" in response
+    assert response["label"] in [0, 1, 2]
 ```
+
+We'll see later how we can leverage the different kinds of tests and how we can leverage them to improve our MLOps feedback loop.
+
+
+## Serving a model (for real)
+
+If you're a data scientist reading this, serving your model might be a huge step outside of your regular attributions.
+
+But this is not how grown-ups serve their models. Time to take an other extra step. Yes, we are going to bundle it in a Docker image.
+
+
+```Dockerfile
+FROM python:3.10
+
+EXPOSE 8000
+WORKDIR /usr/src/app
+
+RUN pip install pipenv
+COPY ./main.py .
+RUN pipenv install --system --deploy
+
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+
+This is not the place (nor I feel qualified) to explain how Docker and the Dockerfile work. But to sum up quickly line by line :
+* We use the ubiquitous python base image
+* We expose the port 8000 (could be another, but this is the default port for FastAPI)
+

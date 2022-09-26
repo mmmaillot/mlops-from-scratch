@@ -8,6 +8,7 @@ notebook = "*"
 scikit-learn = "*"
 jupytext = "*"
 fastapi = {extras = ["all"], version = "*"}
+pytest = "*"
 
 [dev-packages]
 
