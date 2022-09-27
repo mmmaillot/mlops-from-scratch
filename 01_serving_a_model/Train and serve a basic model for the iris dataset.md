@@ -27,10 +27,6 @@ iris_dataset =  load_iris()
 X,  y = iris_dataset["data"], iris_dataset["target"]
 ```
 
-```python
-iris_dataset
-```
-
 ## Getting a training set and a test set
 
 The purpose of this course is not to focus on ML best practices, but you have to understand at least the basics of it. Dividing your dataset in train, test and validation will have a great influence on the final architecture of your MLOps processes.
@@ -62,11 +58,13 @@ See how dumb that model is ? Accuracy is only 39.5%. I'm not even pretending to 
 For now, the most important thing is shipping this model to prod. Even if it's so bad it could hurt your business. Because even if it's in production, nobody will be actually listening to your endpoint. But it's there, and it's actually the most difficult thing to do.
 
 
-## Serving a model
+# Serving a model
 
 There are various ways to serve a model, ie making it available for some external service to call it, and have the model return a prediction or a label.
 
 The most ubiquitous and simple way is just encapsulating it in a webservice. Soooo ... that's what we are going to do now !
+
+## Serving a model (locally)
 
 ```python
 from fastapi import FastAPI
@@ -124,21 +122,57 @@ But this is not how grown-ups serve their models. Time to take an other extra st
 
 
 ```Dockerfile
-FROM python:3.10
+# python base image
+FROM python:3.10 
 
+#expose the port 8000 (could be another, but this is the default port for FastAPI)
 EXPOSE 8000
+
+# this is the working directory
 WORKDIR /usr/src/app
 
 RUN pip install pipenv
 COPY ./main.py .
+
+# this is necessary when pipenv run inside a container
 RUN pipenv install --system --deploy
 
-
+# the command that will be launched in the container
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 
-This is not the place (nor I feel qualified) to explain how Docker and the Dockerfile work. But to sum up quickly line by line :
-* We use the ubiquitous python base image
-* We expose the port 8000 (could be another, but this is the default port for FastAPI)
+This is not the place (nor I feel qualified) to explain how Docker and the Dockerfile work. But I added some comments line by line.
 
+Now you need to :
+1. build the image
+2. launch a container with that image
+
+For this, I created for you a little ... Makefile ! Way easier to use than script files. Want to build ? Just type `make build` in your favourite command line.
+
+Want to run the container ? Type `make run`, go to http://localhost:8000/docs, and see how the magic happens.
+
+Want to kill the container ? Type `make kill` (only works if this is the only container running)
+
+
+```make
+build:
+	docker build . -t basic-model-serve
+
+run:
+	docker run --rm -d -p 8000:8000 basic-model-serve
+
+kill:
+	docker kill $(docker ps -a -q)
+```
+
+
+# Conclusion
+
+In this first example, we have seen how to build a baseline model and encapsulate it in a webservice, and bundle the whole thing in a Docker container. This is a standard practice these days, because of the omnipresence of the cloud.
+
+Of course, there are other ways to use your models, another one would be to make your predictions in batch. Maybe you don't need a real time prediction, maybe you can just label all your dataset during the night, to make it available during the day for your users.
+
+There are a lot of things that could be done in a better way. For example, you should not be training your model at the startup of your webservice. This thing takes time, and your container orchestration service will probably think that your container is not working correctly, and kill it right away. But we will improve every part of this chain in the next chapters.
+
+For now, we have to improve that pretty dumb model of ours, and making the CI do all of the hard work for us.
