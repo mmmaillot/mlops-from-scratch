@@ -17,7 +17,7 @@ jupyter:
 
 ## Getting a dataset
 
-For now, this will be a very simple step. We will be using a scikit-learn dataset, the now famous Iris dataset. It is small, easily downloadable on your laptop, already cleaned up. Later, we will deal with dirty datasets, too big too load on a single machine.
+For now, this will be a very simple step. We will be using a scikit-learn dataset, the now famous Iris dataset. It is small, easily downloadable on your laptop, and already cleaned up. Later, we will deal with dirty datasets, too big too load on a single machine.
 
 But for now, we want to focus on the architecture, and the fastest way to shipping a model to production.
 
@@ -53,7 +53,9 @@ accuracy = dummy_classifier.score(X_test, y_test)
 f"Accuracy : {100*accuracy:.1f}%"
 ```
 
-See how dumb that model is ? Accuracy is only 39.5%. I'm not even pretending to care. We are going to ship this one, then CI and CD (more about this in the next examples) will continuously improve this model until it's state-of-the-art.
+See how dumb that model is ? Accuracy is only 39.5%. I'm not even pretending to care. We are going to ship this one, then we will continuously improve this model with the CI until it's (almost) state-of-the-art.
+
+"Regular" code is built by a CI. Nowadays, nobody (I hope), ships code that has been build locally on his machine. Well it should be the same for model training in machine learning. Your model should be trained by a CI (or something equivalent, like Airflow).
 
 For now, the most important thing is shipping this model to prod. Even if it's so bad it could hurt your business. Because even if it's in production, nobody will be actually listening to your endpoint. But it's there, and it's actually the most difficult thing to do.
 
@@ -132,13 +134,15 @@ EXPOSE 8000
 WORKDIR /usr/src/app
 
 RUN pip install pipenv
+
+COPY ./Pipfile* .
+# this is necessary when pipenv run inside a container
+RUN pipenv install --deploy
+
 COPY ./main.py .
 
-# this is necessary when pipenv run inside a container
-RUN pipenv install --system --deploy
-
 # the command that will be launched in the container
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["pipenv", "run","uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 
@@ -152,7 +156,7 @@ For this, I created for you a little ... Makefile ! Way easier to use than scrip
 
 Want to run the container ? Type `make run`, go to http://localhost:8000/docs, and see how the magic happens.
 
-Want to kill the container ? Type `make kill` (only works if this is the only container running)
+Want to kill the container ? Type `make kill`.
 
 
 ```make
@@ -160,10 +164,10 @@ build:
 	docker build . -t basic-model-serve
 
 run:
-	docker run --rm -d -p 8000:8000 basic-model-serve
+	docker run --name basic-model-serve --rm -d -p 8000:8000 basic-model-serve
 
 kill:
-	docker kill $(docker ps -a -q)
+	docker kill basic-model-serve
 ```
 
 
