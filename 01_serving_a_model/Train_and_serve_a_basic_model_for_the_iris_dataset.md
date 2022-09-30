@@ -179,4 +179,4 @@ Of course, there are other ways to use your models, another one would be to make
 
 There are a lot of things that could be done in a better way. For example, you should not be training your model at the startup of your webservice. This thing takes time, and your container orchestration service will probably think that your container is not working correctly, and kill it right away. But we will improve every part of this chain in the next chapters.
 
-For now, we have to improve that pretty dumb model of ours, and making the CI do all of the hard work for us.
+So, for the next step, we will separate the training of the model, from the serving of the model.
