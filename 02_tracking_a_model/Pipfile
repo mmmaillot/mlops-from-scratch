@@ -7,6 +7,7 @@ name = "pypi"
 notebook = "*"
 scikit-learn = "*"
 jupytext = "*"
+mlflow = "*"
 
 [dev-packages]
 
