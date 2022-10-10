@@ -150,5 +150,55 @@ assert (fetched_model.predict(X_test[0:10]) == dummy_classifier.predict(X_test[0
 Remember, we need to do this in a `serve.py` file. This begs the question : when should we fetch the model. The simplest way (and this is what we are going to do at the step 2 of our journey), is to fetch it at the startup of our webservice. But there are other ways : embedding it in the container at build time, load it from a mounted volume etc, or even use dedicated tools that do all the heavy lifting for you.
 
 ```python
+# this should be in a file called "serve.py"
 
+from fastapi import FastAPI
+from pydantic import BaseModel
+import mlflow.pyfunc
+
+app = FastAPI()
+
+
+class Iris(BaseModel):
+    sepal_length: float
+    sepal_width: float
+    petal_length: float
+    petal_width: float
+
+
+class Label(BaseModel):
+    label: int
+
+
+@app.on_event("startup")
+async def startup_event():
+    global model
+    model_name = "sk-learn-dummy-model"
+    model_stage = "Production"
+
+    mlflow.set_tracking_uri("http://localhost:5001")
+    model = mlflow.pyfunc.load_model(
+        model_uri=f"models:/{model_name}/{model_stage}"
+    )
+
+
+@app.post("/label", response_model=Label)
+async def label(iris: Iris):
+    iris_data = [[iris.sepal_length, iris.sepal_width, iris.petal_length, iris.petal_width]]
+    label = model.predict(iris_data)
+    return Label(label=label[0])
 ```
+
+🎉 Tadaa 🎉 ! At the startup of the application, the model is fetched from the MLFlow registry, and you can use it as if it has just been freshly trained !
+
+Now you should package this in a Docker container, but I'll save you (and me) the hassle for this time.
+
+We have not addressed any security issues, but of course, you should be careful with your model registry. Maybe it should be accessed only from your virtual private cloud, or you should use credentials to access MLFlow.
+
+If you are using an external storage service (such as S3 for example), then you should give access to this service to your MFlow container and your application container.
+
+Next time, we will use even more features from MLFlow to:
+1. 🏗️ Create a better model
+2. 🔍 Compare this model to the one in production
+3. 🤖 Automatically tag the better model as the production one
+4. 💰 Repeat for infinite money
