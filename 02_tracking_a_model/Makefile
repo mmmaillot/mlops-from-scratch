@@ -1,8 +1,14 @@
 build:
 	docker compose build
 
-run:
+up:
 	docker compose up
 
 down:
 	docker compose down
+
+train:
+	pipenv run python train.py
+
+serve:
+	pipenv run uvicorn serve:app --reload

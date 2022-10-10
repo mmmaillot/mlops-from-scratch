@@ -2,9 +2,12 @@ services:
   db:
     image: "postgres"
     environment:
-      POSTGRES_PASSWORD: example
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
 
   mlflow:
     build: ./mlflow
     ports:
       - "5001:5000"
+    expose:
+      - 5000

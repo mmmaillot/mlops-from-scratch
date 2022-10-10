@@ -80,3 +80,75 @@ You could also log all the metada related to the model, the environment from whi
 That's a lot of dev. Good news : it's called an ML Model Registry, and somebody has already done it for you. Today we are going to use [MLFlow](https://mlflow.org/), but there are some others ([neptune.ai](https://neptune.ai/) or [Amazon SageMaker Registry](https://docs.aws.amazon.com/sagemaker/latest/dg/model-registry.html) for example).
 
 Of course you should use it with an external storage, like a cloud storage, but we are just toying around, it will be easier to store the models locally (plus, this way we don't have to pay for a cloud storage service).
+
+## Organizing your services
+
+Ok now things will get a little bit more _DevOpsy_ and a little lest _data sciencish_. We will need at least two containers :
+- one that runs the MLFlow server
+- one that runs a PostgreSQL database
+
+Actually, there should be a third container to run your training, but I'll save you this step for this time.
+The MLFlow container should be accessible from your notebooks, and the MLFlow server should be able to communicate with the Postgres container.
+
+To do all this locally, you can use Docker Compose. So ... bye bye Python, hello YAML. This what your` docker-compose.yaml` :
+
+```yaml
+services:
+  db:
+    image: "postgres"
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+
+  mlflow:
+    build: ./mlflow
+    ports:
+      - "5001:5000"
+    expose:
+      - 5000
+
+```
+
+```python
+import mlflow
+import mlflow.sklearn
+from mlflow import MlflowClient
+
+mlflow.set_tracking_uri("http://localhost:5001")
+
+with mlflow.start_run(run_name="EXAMPLE_RUN") as run:
+    # Log the sklearn model and register as version 1
+    mlflow.sklearn.log_model(
+        sk_model=dummy_classifier,
+        artifact_path="sklearn-model",
+        registered_model_name="sk-learn-dummy-model"
+    )
+
+client = MlflowClient()
+client.transition_model_version_stage(
+    name="sk-learn-dummy-model",
+    version=1,
+    stage="Production"
+)
+```
+
+Wow ! We now have logged our model in the Mlflow Model Registry, and we tagged it for Production from the training side. It's now time to fetch this model from the registry on the serving side.
+
+```python
+import mlflow.pyfunc
+
+model_name = "sk-learn-dummy-model"
+model_version = 1
+
+fetched_model = mlflow.pyfunc.load_model(
+    model_uri=f"models:/{model_name}/{model_version}"
+)
+
+assert (fetched_model.predict(X_test[0:10]) == dummy_classifier.predict(X_test[0:10])).all()
+```
+
+Remember, we need to do this in a `serve.py` file. This begs the question : when should we fetch the model. The simplest way (and this is what we are going to do at the step 2 of our journey), is to fetch it at the startup of our webservice. But there are other ways : embedding it in the container at build time, load it from a mounted volume etc, or even use dedicated tools that do all the heavy lifting for you.
+
+```python
+
+```
